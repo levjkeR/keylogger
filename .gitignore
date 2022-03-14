@@ -1,0 +1,15 @@
+﻿################################################################################
+# Данный GITIGNORE-файл был автоматически создан Microsoft(R) Visual Studio.
+################################################################################
+
+*.db
+*.filters
+*.user
+*.vcxproj
+/keylogger/data1.txt
+/keylogger/data.txt
+/keylogger/1.txt
+/keylogger/x64/Debug
+/.vs/keylogger/v17
+/x64/Debug
+/keylogger.sln
