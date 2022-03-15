@@ -13,3 +13,4 @@
 /.vs/keylogger/v17
 /x64/Debug
 /keylogger.sln
+*.tmp
